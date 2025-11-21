@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
-from pagamento import pagamento, pagamentopix, pagamentocartao
+
 
 class Cliente:
     def __init__(self, nome: str, telefone: str) -> None:
@@ -116,6 +116,44 @@ class ItemPedido:
     def subtotal(self) -> float:
         return self.__preco_unit * self.__quantidade
 
+
+class Pagamento(ABC):
+    def __init__(self, valor: float,
+                 data: Optional[datetime] = None) -> None:
+        self._valor = valor
+        self._data = data or datetime.now()
+
+    @abstractmethod
+    def processar(self) -> str:
+        """Processa o pagamento e retorna uma mensagem de resultado."""
+
+
+class PagamentoPix(Pagamento):
+    def __init__(self, valor: float, chave: str,
+                 data: Optional[datetime] = None) -> None:
+        super().__init__(valor, data)
+        self.__chave = chave
+
+    def processar(self) -> str:
+        return (
+            f"Pagamento de R${self._valor:.2f} via PIX para "
+            f"{self.__chave} realizado com sucesso em {self._data}."
+        )
+
+
+class PagamentoCartao(Pagamento):
+    def __init__(self, valor: float, numero_cartao: str,
+                 data: Optional[datetime] = None) -> None:
+        super().__init__(valor, data)
+        self.__numero_cartao = numero_cartao[-4:]  # só os 4 últimos dígitos
+
+    def processar(self) -> str:
+        return (
+            f"Pagamento de R${self._valor:.2f} no cartão "
+            f"****{self.__numero_cartao} autorizado em {self._data}."
+        )
+
+
 class Pedido:
     def __init__(self, cliente: Cliente, mesa: Mesa) -> None:
         self.__cliente = cliente
@@ -149,7 +187,6 @@ class Pedido:
         return self.__pagamento.processar()
 
     # isso daqui é pro main
-    # joga junto com pagamento
     def get_cliente(self) -> Cliente:
         return self.__cliente
 
@@ -161,5 +198,3 @@ class Pedido:
 
     def get_pagamento(self) -> Optional[Pagamento]:
         return self.__pagamento
-        def definir_pagamento(self, pagamento: Pagamento) -> None:
-            self.__pagamento = pagamento
