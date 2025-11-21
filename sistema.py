@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Optional
-from Pagamento import pagamento, pagamentopix, pagamentocartao
+from pagamento import pagamento, pagamentopix, pagamentocartao
 
 class Cliente:
     def __init__(self, nome: str, telefone: str) -> None:
