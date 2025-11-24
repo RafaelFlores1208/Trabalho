@@ -11,21 +11,15 @@ try:
 except Exception:
     PIL_AVAILABLE = False
 
-# caminho da imagem enviada por você (usada como placeholder)
-# OBS: O caminho IMAGE_FILE deve ser alterado para um caminho acessível no seu ambiente.
-IMAGE_FILE = "/mnt/data/17751107-d138-43f5-8cab-7b272178d5bf.png" 
-
-# Dourado Polido para destaque
+# --- PALETA DE CORES ---
 DORADO_POLIDO = "#BEA95B"
-# Cor de Fundo Escura (Ébano)
-BG_ESCuro = "#1A1512"
+BG_ESCuro = "#1A1512" 
+TEXTO_SUAVE = "#444444" 
+CATEGORIA_HEADER = "#D4AF37"
 
 # dados do menu (nome, preco (float), descricao, imagem_path)
-# ... (Seu dicionário MENU_ITENS permanece o mesmo aqui) ...
-IMAGE_PLACEHOLDER = ""
-
 MENU_ITENS = {
-    "Entradas": [
+    "🥂 Entradas": [
         {
             "nome": "Camarão à Milanesa com Gergelim",
             "preço": 76.00,
@@ -52,7 +46,7 @@ MENU_ITENS = {
         }
     ],
     
-    "Pratos Principais": [
+    "🍽️ Pratos Principais": [
         {
             "nome": "Salmão com Risoto de Limão Siciliano",
             "preço": 125.00,
@@ -73,7 +67,7 @@ MENU_ITENS = {
         }
     ],
     
-    "Acompanhamentos": [
+    "🍚 Acompanhamentos": [
         {
             "nome": "Arroz de Brócolis e Amêndoas",
             "preço": 35.00,
@@ -94,7 +88,7 @@ MENU_ITENS = {
         }
     ],
     
-    "Bebidas": [
+    "🍷 Bebidas": [
         {
             "nome": "Vinho Tinto Reserva",
             "preço": 180.00,
@@ -121,7 +115,7 @@ MENU_ITENS = {
         }
     ],
 
-    "Sobremesas (Estilo Ébano)": [
+    "✨ Sobremesas (Estilo Ébano)": [
         {
             "nome": "Esfera de Chocolate Ébano",
             "preço": 48.00,
@@ -144,128 +138,47 @@ MENU_ITENS = {
 }
 
 
-def create_menu_page(parent):
-    """Cria a página de menu dentro do frame `parent`."""
-    # limpar conteúdo anterior
-    for w in parent.winfo_children():
-        w.destroy()
+# ==========================================================
+# 3. FUNÇÕES AUXILIARES (Definidas antes de serem chamadas!)
+# ==========================================================
 
-    page = Frame(parent, bg=BG_ESCuro)
-    page.pack(fill="both", expand=True)
-
-    # título
-    Label(page, text="Cardápio — Selecione os itens", font=("Georgia", 20, "bold"),
-          fg=DORADO_POLIDO, bg=BG_ESCuro).pack(anchor="w", padx=16, pady=(12,6))
-
-    # área scroll
-    container = Frame(page, bg=BG_ESCuro)
-    container.pack(fill="both", expand=True, padx=12, pady=8)
-
-    canvas = Canvas(container, bg=BG_ESCuro, highlightthickness=0)
-    scrollbar = Scrollbar(container, orient="vertical", command=canvas.yview)
-    scroll_frame = Frame(canvas, bg=BG_ESCuro)
-
-    scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    
-    # Adicionar este binding para o canvas se redimensionar horizontalmente junto com a janela
-    def on_canvas_resize(event):
-        canvas.itemconfig(canvas.find_all()[0], width=event.width)
+# Importa a função create_compra_page do módulo 'compra'
+try:
+    from compra import create_compra_page
+except ImportError:
+    def create_compra_page(parent, usuario_logado=False, email_pix="rafael@email.com"):
+        messagebox.showwarning("Erro", "Módulo 'compra.py' não encontrado ou não importado.")
         
-    canvas.bind('<Configure>', on_canvas_resize)
-    canvas_window = canvas.create_window((0,0), window=scroll_frame, anchor="nw")
-    
-    canvas.configure(yscrollcommand=scrollbar.set)
+def _add_items_to_order(entries, dlg, parent_window):
+    """
+    Função que adiciona os itens selecionados ao módulo de pedidos, 
+    fecha o diálogo e atualiza a tela de compra.
+    """
+    items_added = 0
+    for item, sp in entries:
+        try:
+            qty = int(sp.get())
+            if qty > 0:
+                # CORREÇÃO: Adiciona o item ao order.py
+                order.add_item(item["nome"], item["preço"], qty, desc=item.get("desc",""))
+                items_added += 1
+        except ValueError:
+            messagebox.showerror("Erro de Quantidade", f"Quantidade inválida para {item['nome']}. Use apenas números inteiros.")
+            return
 
-    canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+    if items_added > 0:
+        dlg.destroy()
+        messagebox.showinfo("Adicionado", f"{items_added} itens adicionados à comanda com sucesso.")
+        
+        # Recarrega a página da comanda após a adição para visualização imediata
+        create_compra_page(parent_window) 
+    else:
+        messagebox.showinfo("Nenhum Item Adicionado", "Nenhum item foi adicionado. Verifique as quantidades.")
 
-    # referências de imagens para evitar coleta de lixo
-    photos = []
-    # Lista de variáveis para checkboxes (tupla: (var, item_data_dictionary))
-    checkbox_vars = []
-    
-    # ID global para rastrear os itens no diálogo de quantidade (necessário para o Spinbox)
-    global_item_id = 0
-
-    # ----------------------------------------------------
-    # CORREÇÃO: Itera sobre as categorias (chaves) e as listas de itens (valores)
-    for category_name, items_list in MENU_ITENS.items():
-        # Título da Categoria
-        Label(scroll_frame, text=category_name, font=("Georgia", 16, "underline"),
-              fg="#BEA95B", bg=BG_ESCuro).pack(anchor="w", padx=12, pady=(15, 5))
-
-        # Itera sobre os itens dentro de cada lista de categoria
-        for item in items_list:
-            card = Frame(scroll_frame, bg="white", bd=0, relief="flat")
-            card.pack(fill="x", pady=6, padx=12)
-            card.columnconfigure(1, weight=1) # Permite que a coluna de texto se expanda
-
-            # --- Coluna 0: Imagem (lado esquerdo) ---
-            image_path = item.get("img")
-            ph = None
-            if PIL_AVAILABLE and image_path and os.path.exists(image_path):
-                try:
-                    im = Image.open(image_path).resize((180, 100)) # Reduzi o tamanho para caber melhor
-                    ph = ImageTk.PhotoImage(im)
-                    photos.append(ph)
-                    Label(card, image=ph, bg="white").grid(row=0, column=0, rowspan=4, padx=8, pady=8, sticky="n")
-                except Exception:
-                    ph = None
-            
-            if ph is None:
-                placeholder = Frame(card, width=180, height=100, bg="#E6E6E6")
-                placeholder.grid(row=0, column=0, rowspan=4, padx=8, pady=8, sticky="n")
-                placeholder.pack_propagate(False)
-                Label(placeholder, text="Imagem", bg="#E6E6E6", fg="#777").pack(expand=True)
-
-
-            # --- Coluna 1: Texto e Controles (Direita) ---
-            right = Frame(card, bg="white")
-            right.grid(row=0, column=1, rowspan=4, sticky="nsew", padx=8, pady=8)
-            right.columnconfigure(0, weight=1) # Permite que o texto se expanda
-            
-            # Linha do Nome e Preço
-            top_row = Frame(right, bg="white")
-            top_row.pack(fill="x")
-            
-            Label(top_row, text=item["nome"], bg="white", fg="#222",
-                  font=("Georgia", 14, "bold"), anchor="w").pack(side="left", fill="x", expand=True)
-            
-            # Preço Dourado
-            Label(top_row, text=f"R$ {item['preço']:.2f}", bg="white", fg=DORADO_POLIDO,
-                  font=("Georgia", 14, "bold")).pack(side="right", padx=(10, 0))
-            
-            # Descrição
-            Label(right, text=item["desc"], bg="white", fg="#555",
-                  font=("Georgia", 11), wraplength=450, justify="left").pack(fill="x", pady=(4,6))
-
-            # Checkbox para seleção
-            var = IntVar(value=0)
-            chk = Checkbutton(right, text="Selecionar", variable=var, bg="white", anchor="w")
-            chk.pack(anchor="w", pady=(4,0))
-
-            # Adiciona o dicionário do item em vez do índice simples
-            checkbox_vars.append((var, item)) 
-            
-            global_item_id += 1 # Aumenta o ID para cada item
-
-    # botão para abrir diálogo de quantidades
-    btn_frame = Frame(page, bg=BG_ESCuro)
-    btn_frame.pack(fill="x", padx=16, pady=(6,16))
-    add_selected_btn = Button(btn_frame, text="Adicionar selecionados à comanda",
-                              bg=DORADO_POLIDO, fg="#141107", font=("Georgia", 12, "bold"),
-                              relief="flat", cursor="hand2",
-                              command=lambda: _open_quantity_dialog(parent, checkbox_vars))
-    add_selected_btn.pack(side="right")
-
-    # manter ref para fotos (para evitar garbage collection)
-    page.photos = photos
-    return page
 
 def _open_quantity_dialog(parent, checkbox_vars):
     """Abre um Toplevel onde o usuário define quantidade para cada item selecionado."""
     
-    # Filtrar apenas os itens selecionados (var.get() == 1)
     selected_items_data = [item_data for var, item_data in checkbox_vars if var.get() == 1]
     
     if not selected_items_data:
@@ -275,12 +188,11 @@ def _open_quantity_dialog(parent, checkbox_vars):
     # Criar janela modal
     dlg = Toplevel(parent)
     dlg.title("Quantidade dos Itens Selecionados")
-    # Ajustei o tamanho para melhor visualização
     dlg.geometry("450x400") 
     dlg.transient(parent)
     dlg.grab_set()
     
-    # Criar uma área de scroll dentro do diálogo se houver muitos itens
+    # Configuração do Scroll
     dlg_canvas = Canvas(dlg)
     dlg_scrollbar = Scrollbar(dlg, orient="vertical", command=dlg_canvas.yview)
     dlg_scroll_frame = Frame(dlg_canvas)
@@ -292,52 +204,178 @@ def _open_quantity_dialog(parent, checkbox_vars):
     dlg_canvas.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=(10, 0))
     dlg_scrollbar.pack(side="right", fill="y")
     
-    Label(dlg_scroll_frame, text="Defina a quantidade para cada item:", font=("Georgia", 12, "bold"), bg=dlg_scroll_frame.cget('bg')).pack(anchor="w", padx=12, pady=8)
+    # Aplicando o tema na Toplevel
+    dlg.config(bg=BG_ESCuro)
+    dlg_scroll_frame.config(bg=BG_ESCuro)
+
+    Label(dlg_scroll_frame, text="Defina a quantidade para cada item:", font=("Georgia", 12, "bold"), 
+          bg=BG_ESCuro, fg=DORADO_POLIDO).pack(anchor="w", padx=12, pady=8)
 
     entries = []  # tuplas (item_data_dict, Spinbox)
 
     for item in selected_items_data:
-        row = Frame(dlg_scroll_frame, bg=dlg_scroll_frame.cget('bg'))
+        row = Frame(dlg_scroll_frame, bg=BG_ESCuro)
         row.pack(fill="x", pady=4, padx=12)
 
         # Nome do item e preço
-        Label(row, text=f"{item['nome']} (R$ {item['preço']:.2f})", anchor="w", justify="left", wraplength=280).pack(side="left", fill="x", expand=True)
+        Label(row, text=f"{item['nome']} (R$ {item['preço']:.2f})", anchor="w", justify="left", 
+              wraplength=280, bg=BG_ESCuro, fg="white").pack(side="left", fill="x", expand=True)
         
         # Spinbox para quantidade
-        sp = Spinbox(row, from_=1, to=20, width=4)
+        sp = Spinbox(row, from_=1, to=20, width=4, relief="flat", bg="#FFF", fg="#111")
         sp.pack(side="right", padx=6)
         entries.append((item, sp))
 
     # Botões OK / Cancel
-    btns = Frame(dlg)
+    btns = Frame(dlg, bg=BG_ESCuro)
     btns.pack(fill="x", pady=8)
     
-    # Adicionar o padding correto aos botões
-    Button(btns, text="Adicionar à Comanda", bg=BG_ESCuro, fg="white", 
+    # Botão de Adicionar
+    Button(btns, text="Adicionar à Comanda", bg=DORADO_POLIDO, fg="#141107", 
            font=("Georgia", 11, "bold"), relief="flat", cursor="hand2",
-           command=lambda: _add_items_to_order(entries, dlg)).pack(side="right", padx=12)
-    Button(btns, text="Cancelar", command=dlg.destroy).pack(side="right", padx=8)
+           # Passamos 'parent' para a função de adição para que ela possa recarregar a tela
+           command=lambda: _add_items_to_order(entries, dlg, parent)).pack(side="right", padx=12) 
+           
+    Button(btns, text="Cancelar", command=dlg.destroy, bg="#333", fg="white", relief="flat").pack(side="right", padx=8)
 
-def _add_items_to_order(entries, dlg):
-    """Função que adiciona os itens selecionados ao módulo de pedidos e fecha o diálogo."""
-    # O módulo 'order' precisa ser definido (você pode precisar de um 'order.py' separado)
+
+# ==========================================================
+# 4. FUNÇÃO PRINCIPAL
+# ==========================================================
+
+def create_menu_page(parent):
+    """Cria a página de menu dentro do frame `parent`."""
+    for w in parent.winfo_children():
+        w.destroy()
+
+    page = Frame(parent, bg=BG_ESCuro)
+    page.pack(fill="both", expand=True)
+
+    Label(page, text="Cardápio — Selecione os itens", font=("Georgia", 24, "bold"),
+          fg=CATEGORIA_HEADER, bg=BG_ESCuro).pack(anchor="w", padx=20, pady=(15, 8))
     
-    items_added = 0
-    for item, sp in entries:
-        try:
-            qty = int(sp.get())
-            if qty > 0:
-                # Chama a função no módulo 'order' (assumindo que existe)
-                # order.add_item(nome, preco, quantidade, desc)
-                # Note: Se 'order' não estiver definido, esta linha causará um erro
-                # order.add_item(item["nome"], item["preço"], qty, desc=item.get("desc",""))
-                items_added += 1
-        except ValueError:
-            messagebox.showerror("Erro de Quantidade", f"Quantidade inválida para {item['nome']}. Use apenas números inteiros.")
-            return
 
-    if items_added > 0:
-        dlg.destroy()
-        messagebox.showinfo("Adicionado", f"{items_added} itens adicionados à comanda com sucesso.")
-    else:
-        messagebox.showinfo("Nenhum Item Adicionado", "Nenhum item foi adicionado. Verifique as quantidades.")
+    # Área Scroll
+    container = Frame(page, bg=BG_ESCuro)
+    container.pack(fill="both", expand=True, padx=12, pady=0)
+
+    canvas = Canvas(container, bg=BG_ESCuro, highlightthickness=0)
+    scrollbar = Scrollbar(container, orient="vertical", command=canvas.yview)
+    scroll_frame = Frame(canvas, bg=BG_ESCuro)
+
+    scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    
+    def on_canvas_resize(event):
+        canvas.itemconfig(canvas_window, width=event.width)
+        
+    canvas.bind('<Configure>', on_canvas_resize)
+    canvas_window = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    photos = []
+    checkbox_vars = []
+    
+    # Tamanhos de imagem usados no seu código anterior (130x90)
+    IMAGE_W = 130
+    IMAGE_H = 90
+
+    # Itera sobre as categorias
+    for category_name, items_list in MENU_ITENS.items():
+        # Título da Categoria: Efeito de Destaque
+        category_frame = Frame(scroll_frame, bg=BG_ESCuro)
+        category_frame.pack(fill="x", padx=12, pady=(20, 8))
+        
+        Label(category_frame, text=category_name.upper(), font=("Georgia", 18, "bold"),
+              fg=CATEGORIA_HEADER, bg=BG_ESCuro).pack(side="left")
+        
+        # Linha Decorativa Dourada
+        Frame(category_frame, height=2, bg=DORADO_POLIDO).pack(side="left", fill="x", expand=True, padx=(10, 0))
+
+
+        # Itera sobre os itens
+        for item in items_list:
+            # FRAME DO CARD: Borda Fina Dourada
+            card_wrapper = Frame(scroll_frame, bg=DORADO_POLIDO, padx=1, pady=1) 
+            card_wrapper.pack(fill="x", pady=6, padx=6)
+
+            card = Frame(card_wrapper, bg="#FFFFFF", bd=0, relief="flat")
+            card.pack(fill="x", expand=True)
+            
+            card.columnconfigure(1, weight=1) 
+
+            # --- Coluna 0: Imagem ---
+            image_path = item.get("img")
+            ph = None
+            if PIL_AVAILABLE and image_path and os.path.exists(image_path):
+                try:
+                    im = Image.open(image_path).resize((IMAGE_W, IMAGE_H)) 
+                    ph = ImageTk.PhotoImage(im)
+                    photos.append(ph)
+                    Label(card, image=ph, bg="white").grid(row=0, column=0, rowspan=4, padx=6, pady=6, sticky="nsew") 
+                except Exception:
+                    ph = None
+            
+            if ph is None:
+                # Placeholder centralizado
+                placeholder = Frame(card, width=IMAGE_W, height=IMAGE_H, bg="#EFEFEF")
+                placeholder.grid(row=0, column=0, rowspan=4, padx=6, pady=6, sticky="nsew") 
+                placeholder.pack_propagate(False)
+                Label(placeholder, text="Imagem", bg="#EFEFEF", fg="#AAAAAA", font=("Georgia", 10)).pack(expand=True)
+
+
+            # --- Coluna 1: Texto e Controles (Layout Ajustado) ---
+            right = Frame(card, bg="white")
+            right.grid(row=0, column=1, rowspan=4, sticky="nsew", padx=(0, 8), pady=6)
+            right.columnconfigure(0, weight=1)
+
+            # Frame principal do conteúdo de texto
+            content_frame = Frame(right, bg="white")
+            content_frame.pack(fill="x", expand=True, pady=(0, 4))
+            
+            # 1. NOME DA COMIDA (Centralizado)
+            Label(content_frame, text=item["nome"], bg="white", fg="#111", 
+                  font=("Georgia", 16, "bold"), justify="center"
+                  ).pack(fill="x", pady=(0, 4)) 
+
+            # 2. DESCRIÇÃO (Centralizada)
+            Label(content_frame, text=item["desc"], bg="white", fg=TEXTO_SUAVE,
+                  font=("Georgia", 10), wraplength=300, justify="center"
+                  ).pack(fill="x", pady=(2, 6))
+
+            # 3. PREÇO (Canto Inferior Esquerdo)
+            price_frame = Frame(content_frame, bg="white")
+            price_frame.pack(fill="x", pady=(4, 0))
+            
+            # Label do Preço, ancorada no Oeste ("w" - Esquerda)
+            Label(price_frame, text=f"R$ {item['preço']:.2f}", bg="white", fg=DORADO_POLIDO,
+                  font=("Georgia", 16, "bold"), anchor="w"
+                  ).pack(side="right", padx=10)
+            
+            # Espaçador
+            Frame(price_frame, bg="white").pack(side="left", fill="x", expand=True)
+            
+
+            # 4. Checkbox para seleção (Posicionado no final do bloco 'right')
+            var = IntVar(value=0)
+            chk = Checkbutton(right, text="SELECIONAR", variable=var, bg="white", anchor="w",
+                              fg=DORADO_POLIDO, selectcolor="#E0E0E0",
+                              font=("Georgia", 11, "bold"), activebackground="white", cursor="hand2")
+            chk.pack(anchor="w", pady=(4, 0))
+
+            checkbox_vars.append((var, item)) 
+            
+    # Botão para abrir diálogo de quantidades (no rodapé)
+    btn_frame = Frame(page, bg=BG_ESCuro)
+    btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+    add_selected_btn = Button(btn_frame, text="ADICIONAR SELECIONADOS À COMANDA",
+                              bg=DORADO_POLIDO, fg=BG_ESCuro, font=("Georgia", 13, "bold"),
+                              relief="flat", cursor="hand2", padx=10, pady=5, 
+                              command=lambda: _open_quantity_dialog(parent, checkbox_vars))
+    add_selected_btn.pack(side="right")
+
+    page.photos = photos
+    return page

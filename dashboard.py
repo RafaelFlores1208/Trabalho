@@ -5,7 +5,7 @@ from tkinter import *
 from home_page import create_home_page as create_home_page_content 
 from menu import create_menu_page
 from compra import create_compra_page
-
+from reserva_mesa import criar_reserva_page
 class Dashboard(Tk):
     def __init__(self):
         super().__init__()
@@ -37,7 +37,7 @@ class Dashboard(Tk):
         self.nav_buttons.append(Button(self.sidebar, text="Menu", bg="#2A2218", fg="#F4D465", font=("Georgia", 14),
                relief="flat", command=self.open_menu))
         self.nav_buttons.append(Button(self.sidebar, text="Perfil", bg="#2A2218", fg="#F4D465", font=("Georgia", 14),
-               relief="flat", command=lambda: self.update_content("Perfil")))
+               relief="flat", command=lambda: self.update_content("Perfil")))\
         self.nav_buttons.append(Button(self.sidebar, text="Reserva", bg="#2A2218", fg="#F4D465", font=("Georgia", 14),
                relief="flat", command=lambda: self.update_content("Reserva")))
         self.nav_buttons.append(Button(self.sidebar, text="Compra (Comanda)", bg="#2A2218", fg="#F4D465", font=("Georgia", 14),
