@@ -1,149 +1,201 @@
 # reserva_mesa.py
-from tkinter import *
-from tkinter import messagebox
-import order # Para limpar a comanda após selecionar a mesa e iniciar o pedido
-from servicos import PedidoService
-from sistema import Mesa, Cliente
+# Tela de reservas de mesas (simples, em memória) integrada ao Dashboard
+# Mantém 10 mesas (Mesa 1..Mesa 10) e permite criar, visualizar e cancelar reservas
 
-# --- PALETA DE CORES (Consistente com menu.py) ---
-DORADO_POLIDO = "#BEA95B"
-BG_ESCuro = "#1A1512"
-COR_LIVRE = "#4CAF50" # Verde para Livre
-COR_OCUPADA = "#F44336" # Vermelho para Ocupada
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import datetime
 
-# Inicialização fictícia das Mesas
-# Em um sistema real, isso viria de um banco de dados
-def init_mesas():
-    # Mesas de 2, 4 e 6 lugares
-    mesas = [Mesa(i, 2) for i in range(1, 4)]  # Mesas 1, 2, 3 (2 lugares)
-    mesas += [Mesa(i, 4) for i in range(4, 7)] # Mesas 4, 5, 6 (4 lugares)
-    mesas += [Mesa(i, 6) for i in range(7, 9)] # Mesas 7, 8 (6 lugares)
-    # Define uma mesa inicial como ocupada para teste
-    mesas[3].ocupar() # Mesa 4 começa ocupada
-    return mesas
+# Tema (mantém o estilo do projeto)
+BG = "#1A1512"
+DOURADO = "#F4D465"
+CARD_BG = "#2A2218"
+WHITE = "white"
 
-MESAS_DISPONIVEIS = init_mesas()
-pedido_service = PedidoService()
+# Estado simples em memória: dicionário "Mesa X" -> reserva ou None
+RESERVAS = {f"Mesa {i}": None for i in range(1, 11)}
 
-def liberar_mesa(mesa: Mesa, refresh_func):
-    """Libera a mesa após o pagamento/limpeza, retornando ao status Livre."""
-    if mesa.ocupada:
-        mesa.liberar()
-        # Aqui, em um sistema mais complexo, você registraria a transação do pedido
-        messagebox.showinfo("Mesa Liberada", f"A Mesa {mesa.numero} foi liberada pelo Garçom.")
-        refresh_func()
-    else:
-        messagebox.showwarning("Atenção", f"A Mesa {mesa.numero} já está livre.")
 
-def criar_reserva_page(parent_frame, usuario_logado, navigate_to_menu_func):
+def criar_reserva_page(parent_frame):
+    """Cria a página de reservas dentro do frame de conteúdo do Dashboard.
+    Armazena reservas em memória no dicionário RESERVAS.
+    Campos de reserva: nome, telefone, mesa, data, horário, observação, número de pessoas.
     """
-    Cria a interface de gerenciamento de Mesas para o Garçom/Cliente.
-    Permite visualizar o status e liberar mesas (Garçom) ou selecionar (Cliente).
-    """
-    # Limpa o frame pai
+    # limpa conteúdo
     for w in parent_frame.winfo_children():
         w.destroy()
 
-    # --- 1. Frame Principal (Container) e Scrollbar ---
-    canvas = Canvas(parent_frame, bg=BG_ESCuro, highlightthickness=0)
-    v_scroll = Scrollbar(parent_frame, orient="vertical", command=canvas.yview)
+    container = tk.Frame(parent_frame, bg=BG)
+    container.pack(fill="both", expand=True)
 
-    scroll_frame = Frame(canvas, bg=BG_ESCuro, padx=20, pady=20)
-    canvas.configure(yscrollcommand=v_scroll.set)
-    scroll_frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    # Título
+    tk.Label(container, text="Reservas de Mesas", font=("Georgia", 20, "bold"),
+             bg=BG, fg=DOURADO).pack(pady=(12, 6))
 
-    v_scroll.pack(side="right", fill="y")
-    canvas.pack(side="left", fill="both", expand=True)
-    canvas.create_window((0, 0), window=scroll_frame, anchor="nw", tags="scroll_frame")
+    main = tk.Frame(container, bg=BG)
+    main.pack(fill="both", expand=True, padx=12, pady=8)
 
-    # Título da Página
-    Label(scroll_frame, text="✨ Gerenciamento de Mesas", font=("Georgia", 24, "bold"),
-          fg=DORADO_POLIDO, bg=BG_ESCuro).pack(pady=(10, 20), anchor="center")
+    # Left: lista de mesas
+    left = tk.Frame(main, bg=BG)
+    left.pack(side="left", fill="both", expand=True)
 
-    def refresh_mesa_grid():
-        """Função para reconstruir o grid de mesas e atualizar o status."""
-        
-        # Limpa o grid de mesas antigo
-        for w in mesa_grid_frame.winfo_children():
+    tk.Label(left, text="Mesas", font=("Georgia", 14, "bold"), bg=BG, fg=WHITE).pack(anchor="w", pady=(0,6))
+
+    mesas_frame = tk.Frame(left, bg=BG)
+    mesas_frame.pack(fill="both", expand=True)
+
+    # Right: formulário de criação de reserva
+    right = tk.Frame(main, bg=BG)
+    right.pack(side="right", fill="y", padx=(20,0))
+
+    tk.Label(right, text="Criar / Editar Reserva", font=("Georgia", 14, "bold"), bg=BG, fg=WHITE).pack(anchor="w", pady=(0,6))
+
+    # Formulário
+    form = tk.Frame(right, bg=BG)
+    form.pack(fill="y", pady=6)
+
+    tk.Label(form, text="Nome do Cliente:", bg=BG, fg=WHITE).grid(row=0, column=0, sticky="w")
+    entry_nome = tk.Entry(form, width=30)
+    entry_nome.grid(row=0, column=1, pady=4)
+
+    tk.Label(form, text="Telefone:", bg=BG, fg=WHITE).grid(row=1, column=0, sticky="w")
+    entry_tel = tk.Entry(form, width=30)
+    entry_tel.grid(row=1, column=1, pady=4)
+
+    tk.Label(form, text="Mesa:", bg=BG, fg=WHITE).grid(row=2, column=0, sticky="w")
+    mesa_var = tk.StringVar(value="Mesa 1")
+    mesa_choices = [f"Mesa {i}" for i in range(1, 11)]
+    mesa_menu = ttk.Combobox(form, values=mesa_choices, textvariable=mesa_var, state="readonly", width=28)
+    mesa_menu.grid(row=2, column=1, pady=4)
+
+    tk.Label(form, text="Data (DD/MM/AAAA):", bg=BG, fg=WHITE).grid(row=3, column=0, sticky="w")
+    entry_data = tk.Entry(form, width=30)
+    entry_data.grid(row=3, column=1, pady=4)
+
+    tk.Label(form, text="Horário (HH:MM):", bg=BG, fg=WHITE).grid(row=4, column=0, sticky="w")
+    entry_hora = tk.Entry(form, width=30)
+    entry_hora.grid(row=4, column=1, pady=4)
+
+    tk.Label(form, text="Número de pessoas:", bg=BG, fg=WHITE).grid(row=5, column=0, sticky="w")
+    spin_pessoas = tk.Spinbox(form, from_=1, to=20, width=5)
+    spin_pessoas.grid(row=5, column=1, sticky="w", pady=4)
+
+    tk.Label(form, text="Observação:", bg=BG, fg=WHITE).grid(row=6, column=0, sticky="nw")
+    txt_obs = tk.Text(form, width=22, height=4)
+    txt_obs.grid(row=6, column=1, pady=4)
+
+    # Funções auxiliares
+    def validar_data(data_text):
+        try:
+            datetime.strptime(data_text, "%d/%m/%Y")
+            return True
+        except:
+            return False
+
+    def validar_hora(hora_text):
+        try:
+            datetime.strptime(hora_text, "%H:%M")
+            return True
+        except:
+            return False
+
+    def atualizar_mesas():
+        # limpa quadro
+        for w in mesas_frame.winfo_children():
             w.destroy()
-            
-        # Garante que o PedidoService tem uma instância (global) para controle
-        global pedido_service 
-        
-        # Cria e exibe os botões/boxes das Mesas
-        for i, mesa in enumerate(MESAS_DISPONIVEIS):
-            status = "OCUPADA" if mesa.ocupada else "LIVRE"
-            cor = COR_OCUPADA if mesa.ocupada else COR_LIVRE
 
-            # Frame individual da Mesa
-            mesa_frame = Frame(mesa_grid_frame, bg=BG_ESCuro, bd=2, relief="groove")
-            mesa_frame.grid(row=i // 4, column=i % 4, padx=15, pady=15, sticky="nsew")
-            
-            # Número da Mesa
-            Label(mesa_frame, text=f"MESA {mesa.numero}", font=("Georgia", 18, "bold"),
-                  fg=DORADO_POLIDO, bg=BG_ESCuro).pack(pady=(10, 5))
-            
-            # Capacidade
-            Label(mesa_frame, text=f"{mesa.lugares} Lugares", font=("Georgia", 11),
-                  fg="white", bg=BG_ESCuro).pack(pady=2)
+        # exibe todas as mesas com status
+        for i in range(1, 11):
+            m = f"Mesa {i}"
+            frame = tk.Frame(mesas_frame, bg=CARD_BG if RESERVAS[m] else BG, pady=6)
+            frame.pack(fill="x", padx=4, pady=2)
 
-            # Status (com a cor de status)
-            status_label = Label(mesa_frame, text=status, font=("Georgia", 14, "bold"),
-                                 fg="white", bg=cor, relief="solid", bd=1, padx=10, pady=5)
-            status_label.pack(pady=(5, 10))
+            status = "Reservada" if RESERVAS[m] else "Livre"
+            emoji = "🟡" if RESERVAS[m] else "🟢"
 
-            # --- Botão de Ação ---
-            if mesa.ocupada:
-                # Se ocupada, a ação é liberar (somente Garçom/Admin)
-                btn_text = "Liberar Mesa (Garçom)"
-                btn_color = COR_OCUPADA
-                btn_command = lambda m=mesa: liberar_mesa(m, refresh_mesa_grid)
+            lbl = tk.Label(frame, text=f"{m}  {emoji}", font=("Georgia", 12, "bold"), bg=frame["bg"], fg=DOURADO)
+            lbl.pack(side="left", padx=8)
+
+            if RESERVAS[m]:
+                info = RESERVAS[m]
+                info_text = f"{info['nome']} | {info['data']} {info['hora']} | {info['pessoas']}p"
+                tk.Label(frame, text=info_text, bg=frame["bg"], fg=WHITE).pack(side="left", padx=8)
+
+                tk.Button(frame, text="Cancelar", fg="white", bg="#b03a2e", relief="flat",
+                          command=lambda mesa=m: cancelar_reserva(mesa)).pack(side="right", padx=6)
             else:
-                # Se livre, a ação é selecionar para iniciar o pedido (Cliente/Garçom)
-                btn_text = "Selecionar & Pedir"
-                btn_color = DORADO_POLIDO
-                btn_command = lambda m=mesa: selecionar_mesa_iniciar_pedido(m, navigate_to_menu_func, refresh_mesa_grid)
+                tk.Button(frame, text="Reservar", fg="black", bg=DOURADO, relief="flat",
+                          command=lambda mesa=m: preencher_form_para_mesa(mesa)).pack(side="right", padx=6)
 
-            Button(mesa_frame, text=btn_text, bg=btn_color, fg=BG_ESCuro,
-                   font=("Georgia", 10, "bold"), relief="flat", cursor="hand2",
-                   command=btn_command).pack(fill="x", padx=10, pady=(0, 10))
-            
-    def selecionar_mesa_iniciar_pedido(mesa: Mesa, navigate_func, refresh_func):
-        """
-        Altera o status da mesa para 'ocupada', cria um novo pedido e navega para o menu.
-        """
-        # 1. Confirmação
-        confirmar = messagebox.askyesno(
-            "Confirmar Seleção",
-            f"Deseja selecionar a Mesa {mesa.numero} para iniciar um novo pedido?"
-        )
-        if not confirmar:
+    def preencher_form_para_mesa(mesa):
+        # seleciona a mesa no combobox e foca nome
+        mesa_var.set(mesa)
+        entry_nome.focus_set()
+
+    def cancelar_reserva(mesa):
+        if messagebox.askyesno("Cancelar Reserva", f"Deseja cancelar a reserva de {mesa}?"):
+            RESERVAS[mesa] = None
+            atualizar_mesas()
+            messagebox.showinfo("Cancelado", f"Reserva de {mesa} cancelada.")
+
+    def criar_reserva():
+        nome = entry_nome.get().strip()
+        tel = entry_tel.get().strip()
+        mesa = mesa_var.get()
+        data = entry_data.get().strip()
+        hora = entry_hora.get().strip()
+        pessoas = spin_pessoas.get()
+        obs = txt_obs.get("1.0", "end").strip()
+
+        if not nome:
+            messagebox.showwarning("Dados incompletos", "Preencha o nome do cliente")
+            return
+        if not tel:
+            messagebox.showwarning("Dados incompletos", "Preencha o telefone")
+            return
+        if not validar_data(data):
+            messagebox.showwarning("Data inválida", "Use o formato DD/MM/AAAA")
+            return
+        if not validar_hora(hora):
+            messagebox.showwarning("Horário inválido", "Use o formato HH:MM")
             return
 
-        # 2. Lógica de Reserva
-        mesa.ocupar()
-        
-        # 3. Limpa a comanda existente (crucial)
-        order.clear_order()
-        
-        # 4. Cria um PedidoService (embora o sistema não use este objeto para a comanda Tkinter, a lógica de negócio aqui é registrar a ocupação)
-        # O Pedido real (sistema.Pedido) seria criado no momento do pagamento para persistência, 
-        # mas marcamos a mesa como ocupada agora.
+        # Verifica se já há reserva na mesa
+        if RESERVAS[mesa]:
+            if not messagebox.askyesno("Substituir Reserva", f"{mesa} já está reservada. Substituir?"):
+                return
 
-        messagebox.showinfo("Mesa Selecionada", f"Mesa {mesa.numero} selecionada. Comece a adicionar itens.")
-        
-        # 5. Atualiza o grid de mesas na página de reserva
-        refresh_func() 
-        
-        # 6. Navega para a página de Menu
-        navigate_func("Menu")
+        RESERVAS[mesa] = {
+            "nome": nome,
+            "telefone": tel,
+            "data": data,
+            "hora": hora,
+            "pessoas": pessoas,
+            "observacao": obs,
+            "criada_em": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        }
 
-    # --- Container para o Grid de Mesas ---
-    mesa_grid_frame = Frame(scroll_frame, bg=BG_ESCuro)
-    mesa_grid_frame.pack(pady=20, fill="x", expand=True)
+        messagebox.showinfo("Reserva criada", f"Reserva para {nome} em {mesa} criada com sucesso.")
+        # limpa form
+        entry_nome.delete(0, "end")
+        entry_tel.delete(0, "end")
+        entry_data.delete(0, "end")
+        entry_hora.delete(0, "end")
+        txt_obs.delete("1.0", "end")
+        spin_pessoas.delete(0, "end")
+        spin_pessoas.insert(0, "1")
 
-    # Garante que o grid de mesas seja responsivo
-    for i in range(4): # Assumindo 4 colunas
-        mesa_grid_frame.grid_columnconfigure(i, weight=1)
-        
-    refresh_mesa_grid()
+        atualizar_mesas()
+
+    # Botões do formulário
+    btn_frame = tk.Frame(right, bg=BG)
+    btn_frame.pack(fill="x", pady=6)
+
+    tk.Button(btn_frame, text="Criar Reserva", bg=DOURADO, fg="black", width=18, command=criar_reserva).pack(side="left", padx=6)
+    tk.Button(btn_frame, text="Limpar", bg="#555", fg="white", width=10,
+              command=lambda: (entry_nome.delete(0, 'end'), entry_tel.delete(0, 'end'), entry_data.delete(0, 'end'), entry_hora.delete(0, 'end'), txt_obs.delete('1.0','end'), spin_pessoas.delete(0,'end'), spin_pessoas.insert(0,'1'))).pack(side="left", padx=6)
+
+    # Inicializa display
+    atualizar_mesas()
+
+    return container

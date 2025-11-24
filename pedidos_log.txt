@@ -1,0 +1,18 @@
+
+==============================
+DATA: 24/11/2025 13:25:34
+MÉTODO DE PAGAMENTO: PIX
+EMAIL PIX: l
+ITENS:
+  - Camarão à Milanesa com Gergelim x3 = R$ 228.00
+TOTAL DO PEDIDO: R$ 228.00
+==============================
+
+==============================
+DATA: 24/11/2025 13:27:07
+MÉTODO DE PAGAMENTO: PIX
+EMAIL PIX: kj
+ITENS:
+  - Mix de Legumes Grelhados x3 = R$ 114.00
+TOTAL DO PEDIDO: R$ 114.00
+==============================

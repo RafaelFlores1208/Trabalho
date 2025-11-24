@@ -1,176 +1,208 @@
-# compra.py
-from tkinter import *
-from tkinter import messagebox
+# compra.py - Tela de visualização e edição da comanda
+# Ajustado para funcionar com order.py e integrado ao Dashboard
+# Agora pede opcionalmente o Nome do Cliente para liberar reserva ao pagar.
+
+import tkinter as tk
+from tkinter import messagebox, simpledialog
 import order
 
-# --- Cores do Tema ---
-DORADO_POLIDO = "#BEA95B" # Destaque Dourado Polido
-BG_ESCuro = "#1A1512"    # Cor de Fundo Escura (Ébano)
-COR_CONTRASTE = "#F0F0F0" # Cor para o rótulo de Quantidade
-
-# --- Classes de Pagamento ---
-class Pagamento:
-    """Classe abstrata de pagamento"""
-    def pagar(self, total):
-        raise NotImplementedError("Método pagar deve ser implementado pela subclasse")
-
-class PagamentoPIX(Pagamento):
-    def __init__(self, email):
-        self.email = email
-
-    def pagar(self, total):
-        # Simulação de pagamento PIX
-        return f"Pagamento de R$ {total:.2f} via PIX para {self.email} processado com sucesso!"
-
-# --- Funções de Incremento/Decremento (Auxiliares de refresh_items) ---
-def increment_item(item_name, refresh_func):
-    # Encontra a quantidade atual (current_qty) do item pelo nome (item_name)
-    current_qty = next((it[2] for it in order.get_items() if it[0] == item_name), 0)
-    order.set_quantity(item_name, current_qty + 1)
-    refresh_func()
-    
-def decrement_item(item_name, refresh_func):
-    current_qty = next((it[2] for it in order.get_items() if it[0] == item_name), 0)
-    order.set_quantity(item_name, current_qty - 1)
-    refresh_func()
-
-
-# --- Função principal da comanda ---
-def create_compra_page(parent, usuario_logado=False, email_pix="rafael@email.com"):
-    for w in parent.winfo_children():
+def create_compra_page(parent_frame):
+    """
+    Esta função é chamada pelo Dashboard.
+    Ela destrói os widgets da tela atual e monta a tela da comanda
+    dentro do próprio frame de conteúdo do Dashboard.
+    Agora inclui um campo opcional 'Nome do cliente' que será enviado
+    à tela de pagamento para, se necessário, liberar reservas.
+    """
+    # Limpa a tela atual
+    for w in parent_frame.winfo_children():
         w.destroy()
 
-    page = Frame(parent, bg=BG_ESCuro)
-    page.pack(fill="both", expand=True) # A página principal se expande
+    # Título
+    tk.Label(
+        parent_frame, text="Itens da Comanda",
+        font=("Arial", 18, "bold"),
+        bg="#1A1512", fg="white"
+    ).pack(pady=8)
 
-    # Cabeçalho com tema
-    Label(page, text="Comanda (Compra)", font=("Georgia", 20, "bold"),
-          fg=DORADO_POLIDO, bg=BG_ESCuro).pack(anchor="w", padx=16, pady=(12,6))
+    # Campo opcional: nome do cliente (usado para liberar reserva)
+    nome_frame = tk.Frame(parent_frame, bg="#1A1512")
+    nome_frame.pack(pady=(0,8), fill="x", padx=12)
+    tk.Label(nome_frame, text="Nome do cliente (opcional, se tiver reserva):",
+             bg="#1A1512", fg="#F4D465", font=("Arial", 10)).pack(anchor="w")
+    entry_cliente_nome = tk.Entry(nome_frame, width=40)
+    entry_cliente_nome.pack(anchor="w", pady=4)
 
-    # Status do usuário com tema
-    status_text = "Consultando preços (login necessário para finalizar)" \
-                  if not usuario_logado else "Usuário logado (pode finalizar pedido)"
-    Label(page, text=status_text, font=("Georgia", 12, "italic"),
-          fg=DORADO_POLIDO, bg=BG_ESCuro).pack(anchor="w", padx=16, pady=(0,6))
+    # Frame dos itens
+    frame_itens = tk.Frame(parent_frame, bg="#1A1512")
+    frame_itens.pack(pady=6, fill="both", expand=False, padx=12)
 
-    body = Frame(page, bg=BG_ESCuro)
-    # Corpo se expande para a responsividade
-    body.pack(fill="both", expand=True, padx=12, pady=10) 
+    # Frame total
+    frame_total = tk.Frame(parent_frame, bg="#1A1512")
+    frame_total.pack(pady=6)
 
-    # Cabeçalho da tabela
-    hdr = Frame(body, bg=BG_ESCuro)
-    hdr.pack(fill="x")
-    Label(hdr, text="Item", width=40, anchor="w", bg=BG_ESCuro, fg="white", font=("Georgia", 11, "bold")).pack(side="left")
-    Label(hdr, text="Qtd", width=6, anchor="center", bg=BG_ESCuro, fg="white", font=("Georgia", 11, "bold")).pack(side="left")
-    Label(hdr, text="Subtotal", width=12, anchor="e", bg=BG_ESCuro, fg="white", font=("Georgia", 11, "bold")).pack(side="right", padx=(0,12))
+    label_total = tk.Label(
+        frame_total, text="Total: R$ 0.00",
+        font=("Arial", 16, "bold"),
+        bg="#1A1512", fg="#F4D465"
+    )
+    label_total.pack()
 
-    items_frame = Frame(body, bg=BG_ESCuro)
-    # Quadro da lista de itens se expande e preenche (Crucial para responsividade)
-    items_frame.pack(fill="both", expand=True, pady=(6,12)) 
+    # Atualizar total
+    def atualizar_total():
+        total = order.get_total()
+        label_total.config(text=f"Total: R$ {total:.2f}")
 
-    # Total fixo
-    total_frame = Frame(body, bg=BG_ESCuro)
-    total_label = Label(total_frame, text="", bg=BG_ESCuro, fg=DORADO_POLIDO, font=("Georgia", 16, "bold"))
-    total_label.pack(side="right", padx=12)
-    total_frame.pack(fill="x", padx=12, pady=(6,12)) # Preenche a largura
-
-    # --- Atualiza lista de itens ---
-    def refresh_items():
-        for w in items_frame.winfo_children():
+    # Funções internas
+    def atualizar_lista():
+        for w in frame_itens.winfo_children():
             w.destroy()
 
-        items = order.get_items()
-        for nome, preco, qtd, desc in items:
-            row = Frame(items_frame, bg="white")
-            row.pack(fill="x", padx=12, pady=6)
+        itens = order.get_items()
 
-            left = Frame(row, bg="white")
-            left.pack(side="left", fill="both", expand=True) # O lado esquerdo (nome/desc) se expande
-            Label(left, text=nome, bg="white", fg="#222", font=("Georgia", 12, "bold")).pack(anchor="w")
-            if desc:
-                # wraplength dinâmico para garantir responsividade no texto
-                wraplength_val = max(100, left.winfo_width() - 20) 
-                Label(left, text=desc, bg="white", fg="#555", font=("Georgia", 10), wraplength=wraplength_val).pack(anchor="w")
-
-            # quantidade
-            qty_frame = Frame(row, bg="white", width=80)
-            qty_frame.pack(side="left")
-            
-            # Botão +
-            Button(qty_frame, text="+", width=3, bg=DORADO_POLIDO, fg=BG_ESCuro, relief="flat", cursor="hand2",
-                   command=lambda n=nome: increment_item(n, refresh_items)).pack(side="left", padx=(6,2), pady=6)
-            
-            # Label de Quantidade
-            Label(qty_frame, text=str(qtd), width=4, bg=COR_CONTRASTE, fg="#222", font=("Georgia", 11, "bold")).pack(side="left", padx=2) 
-            
-            # Botão -
-            Button(qty_frame, text="-", width=3, bg=DORADO_POLIDO, fg=BG_ESCuro, relief="flat", cursor="hand2",
-                   command=lambda n=nome: decrement_item(n, refresh_items)).pack(side="left", padx=(2,6), pady=6)
-
-            # subtotal
-            subtotal = preco * qtd
-            Label(row, text=f"R$ {subtotal:.2f}", bg="white", fg="#222", font=("Georgia", 12)).pack(side="right", padx=(0,12))
-
-        # atualiza total
-        total = order.get_total()
-        total_label.config(text=f"Total: R$ {total:.2f}")
-
-    # Bind o evento <Configure> para atualizar a lista ao redimensionar a janela
-    items_frame.bind("<Configure>", lambda e: refresh_items())
-    refresh_items()
-
-    # --- Funções de ação ---
-    actions = Frame(page, bg=BG_ESCuro)
-    actions.pack(fill="x", padx=12, pady=(0,12))
-
-    def on_clear():
-        if messagebox.askyesno("Limpar comanda", "Deseja limpar toda a comanda?"):
-            order.clear_order()
-            create_compra_page(parent, usuario_logado)
-
-    def on_finalize():
-        if not usuario_logado:
-            messagebox.showwarning("Acesso negado", "Você precisa estar logado para finalizar a comanda.")
+        if not itens:
+            tk.Label(frame_itens, text="Nenhum item na comanda.",
+                     bg="#1A1512", fg="white", font=("Arial", 12)).pack()
             return
+
+        for nome, preco, quantidade, desc in itens:
+            row = tk.Frame(frame_itens, bg="#1A1512")
+            row.pack(fill="x", pady=4)
+
+            tk.Label(row, text=f"{nome} - R$ {preco:.2f}",
+                     font=("Arial", 12), bg="#1A1512", fg="white").grid(row=0, column=0, padx=5)
+
+            tk.Button(row, text="-", width=2,
+                      command=lambda n=nome, q=quantidade: alterar_quantidade(n, q-1)).grid(row=0, column=1)
+
+            tk.Label(row, text=str(quantidade),
+                     width=3, bg="#1A1512", fg="white").grid(row=0, column=2)
+
+            tk.Button(row, text="+", width=2,
+                      command=lambda n=nome, q=quantidade: alterar_quantidade(n, q+1)).grid(row=0, column=3)
+
+            tk.Button(row, text="Remover", fg="red",
+                      command=lambda n=nome: remover_item(n)).grid(row=0, column=4, padx=5)
+
+    def alterar_quantidade(nome, nova_qtd):
+        order.set_quantity(nome, nova_qtd)
+        atualizar_lista()
+        atualizar_total()
+
+    def remover_item(nome):
+        order.set_quantity(nome, 0)
+        atualizar_lista()
+        atualizar_total()
+
+    # Botão pagamento -> abre a tela de pagamento passando o nome do cliente (se houver)
+    def ir_pagamento():
+        from pagamento import abrir_tela_pagamento
+        root = parent_frame.winfo_toplevel()
+        cliente_nome = entry_cliente_nome.get().strip()
+        # se vazio, passamos None
+        if cliente_nome == "":
+            cliente_nome = None
+        abrir_tela_pagamento(root, cliente_nome)
+
+    tk.Button(
+        parent_frame, text="Finalizar Pedido",
+        bg="green", fg="white",
+        font=("Arial", 14, "bold"),
+        width=20,
+        command=ir_pagamento
+    ).pack(pady=12)
+
+    # Primeiro carregamento
+    atualizar_lista()
+    atualizar_total()
+
+
+# -------------------------------------------------------------------------
+# FUNÇÃO LEGADA: manter compatibilidade com chamadas que abrem nova janela
+# -------------------------------------------------------------------------
+def abrir_tela_compra(tela_anterior):
+    tela_anterior.withdraw()
+
+    janela = tk.Toplevel()
+    janela.title("Comanda / Itens selecionados")
+    janela.geometry("450x600")
+    janela.configure(bg="#1A1512")
+
+    # ------- TÍTULO -------
+    tk.Label(janela, text="Itens da Comanda", font=("Arial", 16, "bold"), bg="#1A1512", fg="white").pack(pady=10)
+
+    # Campo nome cliente opcional (quando abrir em janela separada)
+    tk.Label(janela, text="Nome do cliente (opcional, se tiver reserva):", bg="#1A1512", fg="#F4D465").pack()
+    entry_cliente = tk.Entry(janela, width=35)
+    entry_cliente.pack(pady=(0,8))
+
+    # Frame da lista de itens
+    frame_itens = tk.Frame(janela, bg="#1A1512")
+    frame_itens.pack(pady=10, fill="both", expand=True)
+
+    def atualizar_lista():
+        for widget in frame_itens.winfo_children():
+            widget.destroy()
 
         itens = order.get_items()
+
         if not itens:
-            messagebox.showwarning("Comanda vazia", "Adicione itens antes de finalizar.")
+            tk.Label(frame_itens, text="Nenhum item na comanda.", bg="#1A1512", fg="white").pack()
             return
 
+        for nome, preco, quantidade, desc in itens:
+            item_frame = tk.Frame(frame_itens, pady=5, bg="#1A1512")
+            item_frame.pack(fill="x")
+
+            tk.Label(item_frame, text=f"{nome} - R$ {preco:.2f}", font=("Arial", 12), bg="#1A1512", fg="white").grid(row=0, column=0, padx=5)
+
+            tk.Button(item_frame, text="-", width=2,
+                      command=lambda n=nome, q=quantidade: alterar_quantidade(n, q - 1)).grid(row=0, column=1)
+
+            tk.Label(item_frame, text=str(quantidade), width=3, bg="#1A1512", fg="white").grid(row=0, column=2)
+
+            tk.Button(item_frame, text="+", width=2,
+                      command=lambda n=nome, q=quantidade: alterar_quantidade(n, q + 1)).grid(row=0, column=3)
+
+            tk.Button(item_frame, text="Remover", fg="red",
+                      command=lambda n=nome: remover_item(n)).grid(row=0, column=4, padx=5)
+
+    def alterar_quantidade(nome, nova_qtd):
+        order.set_quantity(nome, nova_qtd)
+        atualizar_lista()
+        atualizar_total()
+
+    def remover_item(nome):
+        order.set_quantity(nome, 0)
+        atualizar_lista()
+        atualizar_total()
+
+    label_total = tk.Label(janela, text="Total: R$ 0.00", font=("Arial", 14, "bold"), bg="#1A1512", fg="#F4D465")
+    label_total.pack(pady=12)
+
+    def atualizar_total():
         total = order.get_total()
+        label_total.config(text=f"Total: R$ {total:.2f}")
 
-        # Popup de confirmação do total
-        confirmar = messagebox.askyesno(
-            "Confirmar Pagamento",
-            f"O total do pedido é R$ {total:.2f}.\nDeseja confirmar o pagamento?"
-        )
-        if not confirmar:
-            return 
+    def ir_pagamento():
+        from pagamento import abrir_tela_pagamento
+        root = janela
+        cliente_nome = entry_cliente.get().strip()
+        if cliente_nome == "":
+            cliente_nome = None
+        abrir_tela_pagamento(root, cliente_nome)
 
-        # processa pagamento
-        pagamento = PagamentoPIX(email_pix)
-        resultado = pagamento.pagar(total)
+    tk.Button(janela, text="Finalizar Pedido", font=("Arial", 12, "bold"),
+              bg="green", fg="white", width=20, command=ir_pagamento).pack(pady=10)
 
-        # gerar recibo
-        try:
-            with open("recibo.txt", "w", encoding='utf-8') as f:
-                f.write("RECIBO DE COMPRA\n")
-                f.write("=================\n")
-                for nome, preco, qtd, desc in itens:
-                    f.write(f"{nome} x{qtd} - R$ {preco*qtd:.2f}\n")
-                f.write("-----------------\n")
-                f.write(f"TOTAL: R$ {total:.2f}\n")
-                f.write("=================\n")
-        except Exception as e:
-            messagebox.showerror("Erro de Arquivo", f"Não foi possível salvar o recibo: {e}")
+    def voltar():
+        janela.destroy()
+        tela_anterior.deiconify()
 
-        order.clear_order()
-        messagebox.showinfo("Pedido Finalizado", f"{resultado}\nRecibo salvo em 'recibo.txt'.")
-        create_compra_page(parent, usuario_logado)
+    tk.Button(janela, text="Voltar", font=("Arial", 12), width=15,
+              command=voltar).pack(pady=10)
 
-    # Botões de Ação com Tema
-    Button(actions, text="Limpar Comanda", bg="#555", fg="white", relief="flat", cursor="hand2", command=on_clear).pack(side="left", padx=8)
-    Button(actions, text="Finalizar Pedido", bg=DORADO_POLIDO, fg=BG_ESCuro, font=("Georgia", 12, "bold"), relief="flat", cursor="hand2", command=on_finalize).pack(side="right", padx=8)
+    atualizar_lista()
+    atualizar_total()
 
-    return page
+    janela.mainloop()
