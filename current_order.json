@@ -1,14 +1,1 @@
-{
-    "Camarão à Milanesa com Gergelim": {
-        "nome": "Camarão à Milanesa com Gergelim",
-        "preco": 76.0,
-        "quantidade": 1,
-        "desc": "Camarões empanados na milanesa com toque de gergelim. Acompanha molho tártaro artesanal."
-    },
-    "Isca de Peixe Crocante": {
-        "nome": "Isca de Peixe Crocante",
-        "preco": 74.0,
-        "quantidade": 1,
-        "desc": "Iscas de peixe branco empanadas com gergelim, servidas com molho tártaro. Uma entrada leve e saborosa."
-    }
-}
+{}

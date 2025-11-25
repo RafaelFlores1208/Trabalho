@@ -1,136 +1,132 @@
 # reserva_mesa.py
-# Tela de reservas de mesas (simples, em memória) integrada ao Dashboard
-# Mantém 10 mesas (Mesa 1..Mesa 10) e permite criar, visualizar e cancelar reservas
+# Sistema de reservas estilizado com Tkinter
 
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 
-# Tema (mantém o estilo do projeto)
+# ========= 🎨 PALETA DE CORES ==========
 BG = "#1A1512"
 DOURADO = "#F4D465"
 CARD_BG = "#2A2218"
 WHITE = "white"
+CANCEL = "#b03a2e"
+BTN_HOVER = "#e8c25e"
 
-# Estado simples em memória: dicionário "Mesa X" -> reserva ou None
+# ========= 📌 BANCO DE RESERVAS (em memória) =========
 RESERVAS = {f"Mesa {i}": None for i in range(1, 11)}
 
 
+# ============= ⭐ FUNÇÕES DE UI AUXILIARES =====================
+
+def hover_on(e):
+    e.widget["bg"] = BTN_HOVER
+
+def hover_off(e, original):
+    e.widget["bg"] = original
+
+
+def criar_titulo(parent, texto):
+    """ Label de título padrão do sistema """
+    return tk.Label(parent, text=texto, font=("Georgia", 20, "bold"), bg=BG, fg=DOURADO, pady=10)
+
+
+def criar_subtitulo(parent, texto):
+    """ Subtítulo bonito """
+    return tk.Label(parent, text=texto, font=("Georgia", 14, "bold"), bg=BG, fg=WHITE, pady=4)
+
+
+# ====================================================================
+# ========================== RESERVA PAGE =============================
+# ====================================================================
+
 def criar_reserva_page(parent_frame):
-    """Cria a página de reservas dentro do frame de conteúdo do Dashboard.
-    Armazena reservas em memória no dicionário RESERVAS.
-    Campos de reserva: nome, telefone, mesa, data, horário, observação, número de pessoas.
-    """
-    # limpa conteúdo
+
+    # LIMPA TELA
     for w in parent_frame.winfo_children():
         w.destroy()
 
+    # ---------- CONTAINER PRINCIPAL ----------
     container = tk.Frame(parent_frame, bg=BG)
     container.pack(fill="both", expand=True)
 
-    # Título
-    tk.Label(container, text="Reservas de Mesas", font=("Georgia", 20, "bold"),
-             bg=BG, fg=DOURADO).pack(pady=(12, 6))
+    criar_titulo(container, "Reservas de Mesas").pack()
 
     main = tk.Frame(container, bg=BG)
-    main.pack(fill="both", expand=True, padx=12, pady=8)
+    main.pack(fill="both", expand=True, padx=20, pady=10)
 
-    # Left: lista de mesas
+    # ============== 📋 LISTA DE MESAS ==============
     left = tk.Frame(main, bg=BG)
     left.pack(side="left", fill="both", expand=True)
 
-    tk.Label(left, text="Mesas", font=("Georgia", 14, "bold"), bg=BG, fg=WHITE).pack(anchor="w", pady=(0,6))
+    criar_subtitulo(left, "Mesas").pack(anchor="w")
 
     mesas_frame = tk.Frame(left, bg=BG)
     mesas_frame.pack(fill="both", expand=True)
 
-    # Right: formulário de criação de reserva
+    # ============== 📝 FORMULÁRIO ==============
     right = tk.Frame(main, bg=BG)
-    right.pack(side="right", fill="y", padx=(20,0))
+    right.pack(side="right", fill="y", padx=(30, 0))
 
-    tk.Label(right, text="Criar / Editar Reserva", font=("Georgia", 14, "bold"), bg=BG, fg=WHITE).pack(anchor="w", pady=(0,6))
+    criar_subtitulo(right, "Criar / Editar Reserva").pack(anchor="w")
 
-    # Formulário
     form = tk.Frame(right, bg=BG)
-    form.pack(fill="y", pady=6)
+    form.pack(fill="y", pady=8)
 
-    tk.Label(form, text="Nome do Cliente:", bg=BG, fg=WHITE).grid(row=0, column=0, sticky="w")
-    entry_nome = tk.Entry(form, width=30)
-    entry_nome.grid(row=0, column=1, pady=4)
+    # -------- Inputs --------
+    campos = [
+        ("Nome do Cliente:", "nome"),
+        ("Telefone:", "tel"),
+        ("Data (DD/MM/AAAA):", "data"),
+        ("Horário (HH:MM):", "hora"),
+    ]
 
-    tk.Label(form, text="Telefone:", bg=BG, fg=WHITE).grid(row=1, column=0, sticky="w")
-    entry_tel = tk.Entry(form, width=30)
-    entry_tel.grid(row=1, column=1, pady=4)
+    entries = {}
 
+    for i, (label, key) in enumerate(campos):
+        tk.Label(form, text=label, bg=BG, fg=WHITE).grid(row=i, column=0, sticky="w", pady=4)
+        entry = tk.Entry(form, width=30)
+        entry.grid(row=i, column=1, pady=4)
+        entries[key] = entry
+
+    # Mesa
     tk.Label(form, text="Mesa:", bg=BG, fg=WHITE).grid(row=2, column=0, sticky="w")
     mesa_var = tk.StringVar(value="Mesa 1")
     mesa_choices = [f"Mesa {i}" for i in range(1, 11)]
     mesa_menu = ttk.Combobox(form, values=mesa_choices, textvariable=mesa_var, state="readonly", width=28)
     mesa_menu.grid(row=2, column=1, pady=4)
 
-    tk.Label(form, text="Data (DD/MM/AAAA):", bg=BG, fg=WHITE).grid(row=3, column=0, sticky="w")
-    entry_data = tk.Entry(form, width=30)
-    entry_data.grid(row=3, column=1, pady=4)
-
-    tk.Label(form, text="Horário (HH:MM):", bg=BG, fg=WHITE).grid(row=4, column=0, sticky="w")
-    entry_hora = tk.Entry(form, width=30)
-    entry_hora.grid(row=4, column=1, pady=4)
-
+    # Pessoas
     tk.Label(form, text="Número de pessoas:", bg=BG, fg=WHITE).grid(row=5, column=0, sticky="w")
     spin_pessoas = tk.Spinbox(form, from_=1, to=20, width=5)
     spin_pessoas.grid(row=5, column=1, sticky="w", pady=4)
 
+    # Observação
     tk.Label(form, text="Observação:", bg=BG, fg=WHITE).grid(row=6, column=0, sticky="nw")
     txt_obs = tk.Text(form, width=22, height=4)
     txt_obs.grid(row=6, column=1, pady=4)
 
-    # Funções auxiliares
-    def validar_data(data_text):
+    # ====================================================================
+    #                     FUNÇÕES INTERNAS
+    # ====================================================================
+
+    def validar_data(texto):
         try:
-            datetime.strptime(data_text, "%d/%m/%Y")
+            datetime.strptime(texto, "%d/%m/%Y")
             return True
         except:
             return False
 
-    def validar_hora(hora_text):
+    def validar_hora(texto):
         try:
-            datetime.strptime(hora_text, "%H:%M")
+            datetime.strptime(texto, "%H:%M")
             return True
         except:
             return False
-
-    def atualizar_mesas():
-        # limpa quadro
-        for w in mesas_frame.winfo_children():
-            w.destroy()
-
-        # exibe todas as mesas com status
-        for i in range(1, 11):
-            m = f"Mesa {i}"
-            frame = tk.Frame(mesas_frame, bg=CARD_BG if RESERVAS[m] else BG, pady=6)
-            frame.pack(fill="x", padx=4, pady=2)
-
-            status = "Reservada" if RESERVAS[m] else "Livre"
-            emoji = "🟡" if RESERVAS[m] else "🟢"
-
-            lbl = tk.Label(frame, text=f"{m}  {emoji}", font=("Georgia", 12, "bold"), bg=frame["bg"], fg=DOURADO)
-            lbl.pack(side="left", padx=8)
-
-            if RESERVAS[m]:
-                info = RESERVAS[m]
-                info_text = f"{info['nome']} | {info['data']} {info['hora']} | {info['pessoas']}p"
-                tk.Label(frame, text=info_text, bg=frame["bg"], fg=WHITE).pack(side="left", padx=8)
-
-                tk.Button(frame, text="Cancelar", fg="white", bg="#b03a2e", relief="flat",
-                          command=lambda mesa=m: cancelar_reserva(mesa)).pack(side="right", padx=6)
-            else:
-                tk.Button(frame, text="Reservar", fg="black", bg=DOURADO, relief="flat",
-                          command=lambda mesa=m: preencher_form_para_mesa(mesa)).pack(side="right", padx=6)
 
     def preencher_form_para_mesa(mesa):
-        # seleciona a mesa no combobox e foca nome
         mesa_var.set(mesa)
-        entry_nome.focus_set()
+        entries["nome"].focus_set()
 
     def cancelar_reserva(mesa):
         if messagebox.askyesno("Cancelar Reserva", f"Deseja cancelar a reserva de {mesa}?"):
@@ -139,32 +135,30 @@ def criar_reserva_page(parent_frame):
             messagebox.showinfo("Cancelado", f"Reserva de {mesa} cancelada.")
 
     def criar_reserva():
-        nome = entry_nome.get().strip()
-        tel = entry_tel.get().strip()
+        nome = entries["nome"].get().strip()
+        tel = entries["tel"].get().strip()
         mesa = mesa_var.get()
-        data = entry_data.get().strip()
-        hora = entry_hora.get().strip()
+        data = entries["data"].get().strip()
+        hora = entries["hora"].get().strip()
         pessoas = spin_pessoas.get()
         obs = txt_obs.get("1.0", "end").strip()
 
+        # VALIDAÇÕES
         if not nome:
-            messagebox.showwarning("Dados incompletos", "Preencha o nome do cliente")
-            return
+            return messagebox.showwarning("Dados incompletos", "Preencha o nome.")
         if not tel:
-            messagebox.showwarning("Dados incompletos", "Preencha o telefone")
-            return
+            return messagebox.showwarning("Dados incompletos", "Preencha o telefone.")
         if not validar_data(data):
-            messagebox.showwarning("Data inválida", "Use o formato DD/MM/AAAA")
-            return
+            return messagebox.showwarning("Data inválida", "Formato correto: DD/MM/AAAA")
         if not validar_hora(hora):
-            messagebox.showwarning("Horário inválido", "Use o formato HH:MM")
-            return
+            return messagebox.showwarning("Horário inválido", "Formato correto: HH:MM")
 
-        # Verifica se já há reserva na mesa
+        # Se mesa já reservada
         if RESERVAS[mesa]:
             if not messagebox.askyesno("Substituir Reserva", f"{mesa} já está reservada. Substituir?"):
                 return
 
+        # CRIA RESERVA
         RESERVAS[mesa] = {
             "nome": nome,
             "telefone": tel,
@@ -172,30 +166,78 @@ def criar_reserva_page(parent_frame):
             "hora": hora,
             "pessoas": pessoas,
             "observacao": obs,
-            "criada_em": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            "criada_em": datetime.now().strftime("%d/%m/%Y %H:%M")
         }
 
-        messagebox.showinfo("Reserva criada", f"Reserva para {nome} em {mesa} criada com sucesso.")
-        # limpa form
-        entry_nome.delete(0, "end")
-        entry_tel.delete(0, "end")
-        entry_data.delete(0, "end")
-        entry_hora.delete(0, "end")
+        messagebox.showinfo("Sucesso", f"Reserva criada para {nome}!")
+
+        # LIMPA
+        for e in entries.values():
+            e.delete(0, "end")
         txt_obs.delete("1.0", "end")
         spin_pessoas.delete(0, "end")
         spin_pessoas.insert(0, "1")
 
         atualizar_mesas()
 
-    # Botões do formulário
+    # ====================================================================
+    #                    BOTÕES DO FORMULÁRIO
+    # ====================================================================
+
     btn_frame = tk.Frame(right, bg=BG)
-    btn_frame.pack(fill="x", pady=6)
+    btn_frame.pack(fill="x", pady=10)
 
-    tk.Button(btn_frame, text="Criar Reserva", bg=DOURADO, fg="black", width=18, command=criar_reserva).pack(side="left", padx=6)
-    tk.Button(btn_frame, text="Limpar", bg="#555", fg="white", width=10,
-              command=lambda: (entry_nome.delete(0, 'end'), entry_tel.delete(0, 'end'), entry_data.delete(0, 'end'), entry_hora.delete(0, 'end'), txt_obs.delete('1.0','end'), spin_pessoas.delete(0,'end'), spin_pessoas.insert(0,'1'))).pack(side="left", padx=6)
+    btn_reservar = tk.Button(btn_frame, text="Criar Reserva", bg=DOURADO, fg="black", width=18,
+                             relief="flat", command=criar_reserva)
+    btn_reservar.pack(side="left", padx=5)
 
-    # Inicializa display
+    btn_limpar = tk.Button(btn_frame, text="Limpar", bg="#555", fg="white", width=10, relief="flat",
+                           command=lambda: (
+                               [e.delete(0, 'end') for e in entries.values()],
+                               txt_obs.delete("1.0", "end"),
+                               spin_pessoas.delete(0, "end"),
+                               spin_pessoas.insert(0, "1")
+                           ))
+    btn_limpar.pack(side="left", padx=5)
+
+    # Efeitos hover
+    for btn, original in [(btn_reservar, DOURADO), (btn_limpar, "#555")]:
+        btn.bind("<Enter>", lambda e, o=original: hover_on(e))
+        btn.bind("<Leave>", lambda e, o=original: hover_off(e, o))
+
+    # ====================================================================
+    #                  LISTAGEM DE MESAS
+    # ====================================================================
+
+    def atualizar_mesas():
+        for w in mesas_frame.winfo_children():
+            w.destroy()
+
+        for i in range(1, 11):
+            mesa = f"Mesa {i}"
+            reservada = RESERVAS[mesa]
+
+            card = tk.Frame(mesas_frame, bg=CARD_BG if reservada else BG, padx=8, pady=6)
+            card.pack(fill="x", pady=4)
+
+            status = "🟡 Reservada" if reservada else "🟢 Livre"
+
+            tk.Label(card, text=f"{mesa}  {status}", font=("Georgia", 12, "bold"),
+                     bg=card["bg"], fg=DOURADO).pack(side="left")
+
+            if reservada:
+                info = f"{reservada['nome']} | {reservada['data']} {reservada['hora']} | {reservada['pessoas']}p"
+                tk.Label(card, text=info, bg=card["bg"], fg=WHITE).pack(side="left", padx=10)
+
+                btn_cancelar = tk.Button(card, text="Cancelar", bg=CANCEL, fg="white", relief="flat",
+                                         command=lambda m=mesa: cancelar_reserva(m))
+                btn_cancelar.pack(side="right")
+
+            else:
+                btn_reservar_mesa = tk.Button(card, text="Reservar", bg=DOURADO, fg="black", relief="flat",
+                                              command=lambda m=mesa: preencher_form_para_mesa(m))
+                btn_reservar_mesa.pack(side="right")
+
     atualizar_mesas()
 
     return container
