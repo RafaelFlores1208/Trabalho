@@ -10,7 +10,7 @@ from reserva_mesa import criar_reserva_page
 class Dashboard(Tk):
     def __init__(self):
         super().__init__()
-        self.title("Sistema com Menu e Comanda")
+        self.title("Ébano")
         self.geometry("1000x700")
         self.configure(bg="#1A1512")
         
