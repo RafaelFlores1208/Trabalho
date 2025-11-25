@@ -1,7 +1,7 @@
-# dashboard.py
+# dashboard.py #
 
 from tkinter import *
-# Importa a função principal da Home Page
+# Importa a função principal da Home Page #
 from home_page import create_home_page as create_home_page_content 
 from menu import create_menu_page
 from compra import create_compra_page
